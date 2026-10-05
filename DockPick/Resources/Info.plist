@@ -26,5 +26,13 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Yvan Betremieux</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/YvanBetremieux/DockPick/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>qECeEDPNAY1XJ14UI1bJjDGfK5piTv6hFZ8/3Wp6W00=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

@@ -14,11 +14,17 @@ settings:
     DEVELOPMENT_TEAM: ""
     ENABLE_HARDENED_RUNTIME: NO
     MACOSX_DEPLOYMENT_TARGET: "14.0"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
 targets:
   DockPick:
     type: application
     platform: macOS
     sources: [DockPick]
+    dependencies:
+      - package: Sparkle
     info:
       path: DockPick/Resources/Info.plist
       properties:
@@ -29,6 +35,10 @@ targets:
         LSUIElement: true
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "© 2026 Yvan Betremieux"
+        SUFeedURL: https://github.com/YvanBetremieux/DockPick/releases/latest/download/appcast.xml
+        SUPublicEDKey: "qECeEDPNAY1XJ14UI1bJjDGfK5piTv6hFZ8/3Wp6W00="
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
     entitlements:
       path: DockPick/Resources/DockPick.entitlements
       properties:

@@ -14,12 +14,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var catalog = WindowCatalog(settings: settings)
     private let overlay = OverlayController()
     private let thumbnails = ThumbnailProvider()
+    private var updater: UpdaterController?
     private var monitor: DockClickMonitor?
     private var menuBar: MenuBarController?
     private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isRunningTests else { return }
+
+        let updater = UpdaterController()
+        self.updater = updater
 
         overlay.onChoose = { [weak self] window, app, screen in
             guard let self else { return }
@@ -31,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             permissions: permissions,
             actions: .init(
                 openSettings: nil,
-                checkForUpdates: nil,
+                checkForUpdates: { updater.checkForUpdates() },
                 requestAccessibility: { [weak self] in self?.showOnboarding() }
             )
         )
