@@ -12,12 +12,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = Settings.shared
     private let permissions = PermissionsManager()
     private lazy var catalog = WindowCatalog(settings: settings)
+    private let overlay = OverlayController()
+    private let thumbnails = ThumbnailProvider()
     private var monitor: DockClickMonitor?
     private var menuBar: MenuBarController?
     private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isRunningTests else { return }
+
+        overlay.onChoose = { [weak self] window, app, screen in
+            guard let self else { return }
+            WindowActivator.activate(window, app: app, mode: self.settings.openMode, screen: screen)
+        }
 
         menuBar = MenuBarController(
             settings: settings,
@@ -53,16 +60,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleDockClick(app: NSRunningApplication, axLocation: CGPoint) -> Bool {
         let excluded = settings.isExcluded(app.bundleIdentifier)
-        let windows = settings.enabled && !excluded ? catalog.windows(for: app) : []
+        let pickerForThisApp = overlay.isVisible && overlay.currentPID == app.processIdentifier
+        let eligible = settings.enabled && !excluded && !pickerForThisApp
+        let windows = eligible ? catalog.windows(for: app) : []
         let decision = ClickPolicy.decide(ClickContext(
             enabled: settings.enabled,
             isExcluded: excluded,
             windowCount: windows.count,
-            pickerVisibleForThisApp: false
+            pickerVisibleForThisApp: pickerForThisApp
         ))
-        let titles = windows.map(\.info.title).joined(separator: " | ")
-        Self.log.debug("Clic Dock \(app.bundleIdentifier ?? "?", privacy: .public) : \(windows.count) fenêtres → \(String(describing: decision), privacy: .public) [\(titles, privacy: .public)]")
-        return decision == .showPicker
+        Self.log.debug("Clic Dock \(app.bundleIdentifier ?? "?", privacy: .public) : \(windows.count) fenêtres → \(String(describing: decision), privacy: .public)")
+
+        switch decision {
+        case .passThrough:
+            if overlay.isVisible { overlay.hide() }
+            return false
+        case .dismissPicker:
+            overlay.hide()
+            return true
+        case .showPicker:
+            let screen = Self.screen(containingAX: axLocation)
+            let provider = settings.previewMode == .live ? thumbnails : nil
+            Task { @MainActor [overlay] in
+                overlay.show(app: app, windows: windows, on: screen, thumbnails: provider)
+            }
+            return true
+        }
+    }
+
+    static func screen(containingAX point: CGPoint) -> NSScreen {
+        let screens = NSScreen.screens
+        guard let primary = screens.first else { return NSScreen.main! }
+        let cocoaPoint = ScreenGeometry.cocoaPoint(fromAX: point, primaryScreenHeight: primary.frame.height)
+        if let index = ScreenGeometry.screenIndex(containing: cocoaPoint, screenFrames: screens.map(\.frame)) {
+            return screens[index]
+        }
+        return NSScreen.main ?? primary
     }
 
     private func showOnboarding() {
