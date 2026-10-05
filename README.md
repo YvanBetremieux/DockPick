@@ -6,8 +6,9 @@ Clic sur une icône du Dock → si l'app a au moins 2 fenêtres, DockPick affich
 
 1. Télécharger `DockPick-x.y.z.dmg` depuis les [Releases](https://github.com/YvanBetremieux/DockPick/releases/latest).
 2. Glisser **DockPick** dans **Applications**.
-3. Premier lancement : clic droit sur DockPick › **Ouvrir** (l'app n'est pas notarisée par Apple).
-   Ou : `xattr -dr com.apple.quarantine /Applications/DockPick.app`
+3. Premier lancement : l'app n'est pas notarisée par Apple, macOS affiche « Apple n'a pas pu confirmer… ».
+   Dans le Terminal : `xattr -dr com.apple.quarantine /Applications/DockPick.app`
+   Ou : Réglages Système › Confidentialité et sécurité › **Ouvrir quand même** (le clic droit › Ouvrir ne suffit plus depuis macOS 15).
 4. Accorder **Accessibilité** (obligatoire) et **Enregistrement d'écran** (aperçus) via la fenêtre d'accueil.
 
 Les mises à jour suivantes s'installent depuis le menu › **Rechercher les mises à jour…** ou automatiquement.
@@ -48,7 +49,9 @@ Le script vérifie l'identité Git et le compte `gh`, compile et signe, crée le
 - [ ] Chrome avec 2, 3, 4, 5, 6 fenêtres → bonne disposition, bons titres, aperçus.
 - [ ] 1 fenêtre / app non lancée → comportement Dock normal.
 - [ ] Finder (exclu par défaut) → comportement normal.
-- [ ] ⌘-clic, ⌥-clic, clic droit, glisser sur le Dock → inchangés.
+- [ ] ⌘-clic, ⌥-clic, clic droit, glisser et appui prolongé sur le Dock → inchangés.
+- [ ] Dock masqué automatiquement : la grille ne passe pas sous le Dock.
+- [ ] Survol d'une case → mise en évidence.
 - [ ] Corbeille, dossiers du Dock → inchangés.
 - [ ] Multi-écran : la vue s'ouvre sur l'écran cliqué ; « Agrandir » vise cet écran.
 - [ ] Fenêtre réduite → badge, dé-réduite au clic.

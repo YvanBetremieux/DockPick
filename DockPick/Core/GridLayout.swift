@@ -45,3 +45,10 @@ enum GridLayout {
         return frames
     }
 }
+
+extension GridLayout {
+    /// Case située sous le point (même repère que `frames`), ou nil dans les marges et espacements.
+    static func index(at point: CGPoint, in frames: [CGRect]) -> Int? {
+        frames.firstIndex { $0.contains(point) }
+    }
+}

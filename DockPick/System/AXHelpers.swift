@@ -26,14 +26,29 @@ extension AXUIElement {
     func url(_ attribute: String) -> URL? { copyValue(attribute) as? URL }
     func elements(_ attribute: String) -> [AXUIElement] { copyValue(attribute) as? [AXUIElement] ?? [] }
 
-    func point(_ attribute: String) -> CGPoint? {
-        guard let value = copyValue(attribute), CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+    func point(_ attribute: String) -> CGPoint? { Self.decodePoint(copyValue(attribute)) }
+    func size(_ attribute: String) -> CGSize? { Self.decodeSize(copyValue(attribute)) }
+
+    /// Plusieurs attributs en un seul aller-retour IPC ; nil pour chaque attribut en erreur.
+    func values(_ attributes: [String]) -> [CFTypeRef?] {
+        var result: CFArray?
+        guard AXUIElementCopyMultipleAttributeValues(self, attributes as CFArray, AXCopyMultipleAttributeOptions(rawValue: 0), &result) == .success,
+              let array = result as? [CFTypeRef], array.count == attributes.count
+        else { return Array(repeating: nil, count: attributes.count) }
+        return array.map { value in
+            if CFGetTypeID(value) == AXValueGetTypeID(), AXValueGetType(value as! AXValue) == .axError { return nil }
+            return value
+        }
+    }
+
+    static func decodePoint(_ value: CFTypeRef?) -> CGPoint? {
+        guard let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         var point = CGPoint.zero
         return AXValueGetValue(value as! AXValue, .cgPoint, &point) ? point : nil
     }
 
-    func size(_ attribute: String) -> CGSize? {
-        guard let value = copyValue(attribute), CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+    static func decodeSize(_ value: CFTypeRef?) -> CGSize? {
+        guard let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         var size = CGSize.zero
         return AXValueGetValue(value as! AXValue, .cgSize, &size) ? size : nil
     }

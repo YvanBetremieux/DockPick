@@ -11,6 +11,30 @@ final class OverlayPanel: NSPanel {
     }
 }
 
+/// Suit la souris même quand DockPick n'est pas l'app active (SwiftUI `onHover` ne le fait pas).
+final class HoverTrackingEffectView: NSVisualEffectView {
+    /// Point en coordonnées avec origine en haut à gauche, comme la grille SwiftUI.
+    var onMouseMoved: ((CGPoint) -> Void)?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        ))
+    }
+
+    override func mouseMoved(with event: NSEvent) { report(event) }
+    override func mouseEntered(with event: NSEvent) { report(event) }
+
+    private func report(_ event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        onMouseMoved?(CGPoint(x: point.x, y: bounds.height - point.y))
+    }
+}
+
 @MainActor
 final class OverlayController {
     var onChoose: ((AppWindow, NSRunningApplication, NSScreen) -> Void)?
@@ -26,8 +50,12 @@ final class OverlayController {
 
     var isVisible: Bool { panel?.isVisible ?? false }
 
-    func show(app: NSRunningApplication, windows: [AppWindow], on screen: NSScreen, thumbnails: ThumbnailProvider?) {
+    /// `dockFrame` : barre d'icônes du Dock en coordonnées AX, que la vue doit éviter.
+    func show(app: NSRunningApplication, windows: [AppWindow], on screen: NSScreen, dockFrame: CGRect?, thumbnails: ThumbnailProvider?) {
         hide()
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+        let dockFrames = dockFrame.map { [ScreenGeometry.cocoaRect(fromAX: $0, primaryScreenHeight: primaryHeight)] } ?? []
+        let frame = DockAvoidance.usableFrame(visibleFrame: screen.visibleFrame, dockFrames: dockFrames)
         let appName = app.localizedName ?? "App"
         let items = windows.enumerated().map { index, window in
             PickerItem(
@@ -40,7 +68,7 @@ final class OverlayController {
         model.onChoose = { [weak self] index in self?.choose(index) }
         model.onCancel = { [weak self] in self?.hide() }
 
-        let panel = OverlayPanel(contentRect: screen.visibleFrame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let panel = OverlayPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         // Juste sous le Dock : le Dock reste cliquable au-dessus de la vue.
         panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)) - 1)
         panel.isOpaque = false
@@ -50,16 +78,23 @@ final class OverlayController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.onKeyDown = { [weak self] event in self?.handleKey(event) ?? false }
 
-        let effect = NSVisualEffectView()
+        let effect = HoverTrackingEffectView()
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
         effect.state = .active
+        effect.onMouseMoved = { [weak model, weak effect] point in
+            guard let model, let effect else { return }
+            let frames = GridLayout.frames(count: model.items.count, in: CGRect(origin: .zero, size: effect.bounds.size))
+            if let index = GridLayout.index(at: point, in: frames), model.selectedIndex != index {
+                model.selectedIndex = index
+            }
+        }
         let host = NSHostingView(rootView: PickerView(model: model))
         host.autoresizingMask = [.width, .height]
         effect.addSubview(host)
         panel.contentView = effect
         host.frame = effect.bounds
-        panel.setFrame(screen.visibleFrame, display: true)
+        panel.setFrame(frame, display: true)
         panel.makeKeyAndOrderFront(nil)
 
         resignObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
@@ -75,7 +110,7 @@ final class OverlayController {
 
         if let thumbnails {
             let ids = windows.compactMap(\.info.windowID)
-            let maxSize = CGSize(width: screen.visibleFrame.width / 2, height: screen.visibleFrame.height / 2)
+            let maxSize = CGSize(width: frame.width / 2, height: frame.height / 2)
             thumbnailTask = Task { [weak model] in
                 let images = await thumbnails.thumbnails(for: ids, maxSize: maxSize)
                 guard !Task.isCancelled else { return }
@@ -108,16 +143,14 @@ final class OverlayController {
     private func handleKey(_ event: NSEvent) -> Bool {
         guard let model else { return false }
         switch event.keyCode {
-        case 53: hide()                       // Échap
-        case 36, 76: model.chooseSelected()   // Entrée, Entrée du pavé
-        case 123: model.move(.left)
-        case 124: model.move(.right)
-        case 125: model.move(.down)
-        case 126: model.move(.up)
+        case KeyCodes.escape: hide()
+        case KeyCodes.returnKey, KeyCodes.keypadEnter: model.chooseSelected()
+        case KeyCodes.left: model.move(.left)
+        case KeyCodes.right: model.move(.right)
+        case KeyCodes.down: model.move(.down)
+        case KeyCodes.up: model.move(.up)
         default:
-            guard let character = event.charactersIgnoringModifiers?.first,
-                  let digit = character.wholeNumberValue, (1...9).contains(digit)
-            else { return false }
+            guard let digit = KeyCodes.digit(for: event.keyCode) else { return false }
             model.choose(digit - 1)
         }
         return true

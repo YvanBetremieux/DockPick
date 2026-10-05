@@ -75,3 +75,17 @@ final class GridLayoutTests: XCTestCase {
         XCTAssertEqual(GridLayout.frames(count: 3, in: CGRect(x: 0, y: 0, width: 80, height: 80)), [])
     }
 }
+
+final class GridHitTestTests: XCTestCase {
+    func testIndexAtPointFindsTile() {
+        let frames = GridLayout.frames(count: 4, in: CGRect(x: 0, y: 0, width: 1600, height: 1000))
+        XCTAssertEqual(GridLayout.index(at: CGPoint(x: frames[3].midX, y: frames[3].midY), in: frames), 3)
+        XCTAssertEqual(GridLayout.index(at: CGPoint(x: frames[0].minX + 1, y: frames[0].minY + 1), in: frames), 0)
+    }
+
+    func testIndexAtPointInGapOrMarginIsNil() {
+        let frames = GridLayout.frames(count: 2, in: CGRect(x: 0, y: 0, width: 1600, height: 1000))
+        XCTAssertNil(GridLayout.index(at: CGPoint(x: 10, y: 10), in: frames))
+        XCTAssertNil(GridLayout.index(at: CGPoint(x: (frames[0].maxX + frames[1].minX) / 2, y: frames[0].midY), in: frames))
+    }
+}

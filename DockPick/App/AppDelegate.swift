@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     private var onboardingWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var monitorRetryTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isRunningTests else { return }
@@ -51,23 +52,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func accessibilityReady() {
         menuBar?.refreshIcon()
-        guard monitor == nil else { return }
-        let monitor = DockClickMonitor { [weak self] app, location in
-            self?.handleDockClick(app: app, axLocation: location) ?? false
+        startMonitor()
+    }
+
+    private func startMonitor() {
+        if monitor == nil {
+            monitor = DockClickMonitor(
+                shouldInspect: { [weak self] in
+                    guard let self else { return false }
+                    return self.settings.enabled || self.overlay.isVisible
+                },
+                handler: { [weak self] app, location in
+                    self?.handleDockClick(app: app, axLocation: location)
+                }
+            )
         }
+        guard let monitor, !monitor.isRunning else { return }
         if monitor.start() {
-            self.monitor = monitor
             Self.log.info("Surveillance du Dock démarrée")
+            monitorRetryTimer?.invalidate()
+            monitorRetryTimer = nil
+            menuBar?.monitorActive = true
         } else {
-            Self.log.error("Impossible de créer l'event tap")
+            // Juste après l'octroi de l'accessibilité, macOS refuse parfois le tap : on réessaie.
+            Self.log.error("Impossible de créer l'event tap, nouvel essai dans 2 s")
+            menuBar?.monitorActive = false
+            guard monitorRetryTimer == nil else { return }
+            monitorRetryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.startMonitor() }
+            }
         }
     }
 
-    private func handleDockClick(app: NSRunningApplication, axLocation: CGPoint) -> Bool {
+    private func handleDockClick(app: NSRunningApplication, axLocation: CGPoint) -> (() -> Void)? {
         let excluded = settings.isExcluded(app.bundleIdentifier)
         let pickerForThisApp = overlay.isVisible && overlay.currentPID == app.processIdentifier
         let eligible = settings.enabled && !excluded && !pickerForThisApp
-        let windows = eligible ? catalog.windows(for: app) : []
+        let windows = eligible ? (catalog.windows(for: app) ?? []) : []
         let decision = ClickPolicy.decide(ClickContext(
             enabled: settings.enabled,
             isExcluded: excluded,
@@ -79,17 +100,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch decision {
         case .passThrough:
             if overlay.isVisible { overlay.hide() }
-            return false
+            return nil
         case .dismissPicker:
-            overlay.hide()
-            return true
+            return { [overlay] in overlay.hide() }
         case .showPicker:
             let screen = Self.screen(containingAX: axLocation)
+            let dockFrame = monitor?.dockIconStripFrame()
             let provider = settings.previewMode == .live ? thumbnails : nil
-            Task { @MainActor [overlay] in
-                overlay.show(app: app, windows: windows, on: screen, thumbnails: provider)
+            return { [overlay] in
+                overlay.show(app: app, windows: windows, on: screen, dockFrame: dockFrame, thumbnails: provider)
             }
-            return true
         }
     }
 

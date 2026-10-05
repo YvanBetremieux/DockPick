@@ -14,7 +14,12 @@ enum WindowFactory {
 
     @MainActor
     static func present(_ window: NSWindow) {
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        // Appelé depuis le menu de la barre d'état : on attend la fin du suivi du menu,
+        // sinon macOS ignore l'activation et la fenêtre reste derrière.
+        DispatchQueue.main.async {
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
     }
 }

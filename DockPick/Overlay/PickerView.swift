@@ -18,7 +18,6 @@ struct PickerView: View {
                             .frame(width: frame.width, height: frame.height)
                             .position(x: frame.midX, y: frame.midY)
                             .onTapGesture { model.choose(index) }
-                            .onHover { inside in if inside { model.selectedIndex = index } }
                     }
                 }
             }

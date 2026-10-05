@@ -12,6 +12,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let settings: Settings
     private let permissions: PermissionsManager
     private let actions: Actions
+    /// Faux si l'interception du Dock n'a pas pu démarrer.
+    var monitorActive = true { didSet { refreshIcon() } }
 
     init(settings: Settings, permissions: PermissionsManager, actions: Actions) {
         self.settings = settings
@@ -25,7 +27,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func refreshIcon() {
-        let symbol = permissions.accessibilityGranted ? "rectangle.split.2x2" : "exclamationmark.triangle"
+        let symbol = permissions.accessibilityGranted && monitorActive ? "rectangle.split.2x2" : "exclamationmark.triangle"
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "DockPick")
         image?.isTemplate = true
         statusItem.button?.image = image

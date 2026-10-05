@@ -5,12 +5,15 @@ import ApplicationServices
 enum WindowActivator {
     static func activate(_ window: AppWindow, app: NSRunningApplication, mode: OpenMode, screen: NSScreen) {
         let element = window.element
+        // Hors de l'event tap : on laisse le temps aux apps lentes (Xcode…) de répondre.
+        AXUIElementSetMessagingTimeout(element, 1.0)
         if element.bool(kAXMinimizedAttribute) == true {
             element.setBool(kAXMinimizedAttribute, false)
         }
 
         // Activation coopérative (macOS 14+) : on passe par AX, l'appel AppKit sert de filet de sécurité.
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(appElement, 1.0)
         appElement.setBool(kAXFrontmostAttribute, true)
         let raised = element.perform(kAXRaiseAction)
         element.setBool(kAXMainAttribute, true)
