@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var monitor: DockClickMonitor?
     private var menuBar: MenuBarController?
     private var onboardingWindow: NSWindow?
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isRunningTests else { return }
@@ -34,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings: settings,
             permissions: permissions,
             actions: .init(
-                openSettings: nil,
+                openSettings: { [weak self] in self?.showSettings() },
                 checkForUpdates: { updater.checkForUpdates() },
                 requestAccessibility: { [weak self] in self?.showOnboarding() }
             )
@@ -100,6 +101,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return screens[index]
         }
         return NSScreen.main ?? primary
+    }
+
+    private func showSettings() {
+        guard let updater else { return }
+        if settingsWindow == nil {
+            settingsWindow = WindowFactory.makeWindow(
+                title: "Réglages DockPick",
+                content: SettingsView(settings: settings, permissions: permissions, updater: updater)
+            )
+        }
+        if let settingsWindow { WindowFactory.present(settingsWindow) }
     }
 
     private func showOnboarding() {
