@@ -19,7 +19,7 @@ Distribution via GitHub Releases (repo public `YvanBetremieux/DockPick`), mises 
 
 ## 2. Contraintes
 
-- macOS 14+ (Sonoma), Swift 6, SwiftUI + AppKit.
+- macOS 14+ (Sonoma), toolchain Swift 6.4 en mode langage Swift 5, SwiftUI + AppKit.
 - Pas de compte Apple Developer : app signée avec un certificat auto-signé stable, non notarisée.
 - Projet généré par XcodeGen (`project.yml` versionné, `.xcodeproj` ignoré).
 - Interface en français.
@@ -35,7 +35,7 @@ App `LSUIElement` (pas d'icône Dock), une icône dans la barre de menus.
 |---|---|---|
 | `DockClickMonitor` | `CGEventTap` sur `leftMouseDown` / `leftMouseUp`. Hit-test AX (`AXUIElementCopyElementAtPosition`) ; si l'élément appartient au process `com.apple.dock` avec le rôle `AXDockItem`, lit `AXURL` → bundle id → `NSRunningApplication`. Consulte `ClickPolicy`. Si interception : avale le mouseDown **et** le mouseUp associé. Réactive le tap sur `tapDisabledByTimeout` / `tapDisabledByUserInput`. | AX, `ClickPolicy`, `WindowCatalog` |
 | `ClickPolicy` | Fonction pure : `(enabled, excludedBundleIDs, bundleID, windowCount) → .passThrough \| .showPicker`. Règle : intercepter si activé, non exclu, `windowCount >= 2`. | — |
-| `WindowCatalog` | Liste les fenêtres d'une app via AX (`kAXWindowsAttribute` : titre, `AXMinimized`, position, taille, sous-rôle) et les rapproche des `CGWindowID` (`_AXUIElementGetWindow`, repli sur correspondance frame/titre via `CGWindowListCopyWindowInfo`). Filtre : sous-rôle `AXStandardWindow` uniquement ; réduites et autres Spaces selon réglages. Le filtrage est une fonction pure sur un modèle `WindowInfo`. | AX, CoreGraphics, `Settings` |
+| `WindowCatalog` | Liste les fenêtres d'une app via AX (`kAXWindowsAttribute` : titre, `AXMinimized`, position, taille, sous-rôle) et les rapproche des `CGWindowID` (`_AXUIElementGetWindow`, repli sur correspondance frame/titre via `CGWindowListCopyWindowInfo`). Filtre : sous-rôle `AXStandardWindow` uniquement ; réduites et autres Spaces selon réglages. Le filtrage est une fonction pure sur un modèle `WindowInfo`. Les fenêtres d'autres Spaces ne sont visibles que si l'app les expose via AX (pas de technique privée). | AX, CoreGraphics, `Settings` |
 | `ThumbnailProvider` | Captures ponctuelles via ScreenCaptureKit (`SCShareableContent` + `SCScreenshotManager.captureImage`) à l'ouverture de la vue, en parallèle. Repli : icône de l'app si permission absente, mode « titres seuls », ou fenêtre non capturable (réduite). | ScreenCaptureKit, `Settings` |
 | `GridLayout` | Fonction pure : `(count, containerRect, margin, spacing) → [CGRect]`. | — |
 | `OverlayController` | `NSPanel` non activant, borderless, niveau `.popUpMenu`, sur l'écran contenant le curseur, fond assombri + flou (`NSVisualEffectView`). Contenu SwiftUI. Ferme sur Échap, clic hors case, ou nouveau clic sur la même icône Dock. | `GridLayout`, `ThumbnailProvider` |
@@ -65,7 +65,7 @@ Le callback de l'event tap doit rester court (macOS désactive les taps lents) :
 
 - Accessibilité refusée : monitor inactif, icône barre de menus avec badge d'alerte, menu « Autoriser l'accessibilité… ».
 - Enregistrement d'écran refusé : mode titres seuls de fait.
-- Fenêtre fermée pendant l'affichage : case retirée au moment de l'activation (échec AX → on rafraîchit la liste ; si < 2, on ferme et on active l'app).
+- Fenêtre fermée pendant l'affichage : si l'activation AX échoue, on active simplement l'app.
 - App qui ne répond pas à AX (timeout) : passer l'événement (ne jamais bloquer le Dock).
 - Clic droit / clic prolongé sur le Dock : non interceptés (seul le clic gauche simple l'est).
 
@@ -123,7 +123,7 @@ Miniature au ratio d'origine, centrée (aspect fit), coins arrondis ; en dessous
 ### Signature
 
 - `scripts/setup-signing.sh` (une fois) : crée un certificat auto-signé de signature de code « DockPick Self-Signed » dans le trousseau de session.
-- Build signé avec cette identité, hardened runtime, entitlements minimaux (pas de sandbox : l'event tap global et AX l'exigent).
+- Build signé avec cette identité, sans hardened runtime (inutile sans notarisation et incompatible avec le chargement de Sparkle.framework sous un certificat sans Team ID), entitlements minimaux (pas de sandbox : l'event tap global et AX l'exigent).
 - Identité stable → exigence désignée stable → les autorisations TCC survivent aux mises à jour.
 
 ### Sparkle
