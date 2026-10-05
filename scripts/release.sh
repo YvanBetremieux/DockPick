@@ -44,7 +44,7 @@ xcodebuild build -project DockPick.xcodeproj -scheme DockPick -configuration Rel
   -destination 'generic/platform=macOS' -derivedDataPath build/DerivedData -quiet
 APP="build/DerivedData/Build/Products/Release/DockPick.app"
 codesign --verify --deep --strict "$APP"
-SIGNATURE="$(codesign -dv "$APP" 2>&1)"
+SIGNATURE="$(codesign -dv --verbose=2 "$APP" 2>&1)"
 [[ "$SIGNATURE" == *"Authority=$IDENTITY"* ]] || fail "L'app n'est pas signée avec « $IDENTITY »"
 
 # Archives
